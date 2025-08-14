@@ -15,9 +15,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.x'
-      - run: cd Files && pip install -r requirements.txt
-      - run: cd Files && python app.py
-      - run: cd Files && python sort.py
+      - run: cd files && pip install -r requirements.txt
+      - run: cd files && python app.py
+      - run: cd files && python sort.py
       - uses: EndBug/add-and-commit@v9
         with:
           author_name: T3stAcc
