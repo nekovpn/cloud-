@@ -3,14 +3,9 @@
 name: Scrape, Test, and Send Proxies
 
 on:
-  # این بخش به شما اجازه می‌دهد ورک‌فلو را به صورت دستی از تب Actions اجرا کنید
   workflow_dispatch:
-
-  # این بخش ورک‌فلو را هر ۳ ساعت یک‌بار به صورت خودکار اجرا می‌کند
   schedule:
-    - cron: '0 */3 * * *' # هر ۳ ساعت
-
-  # این بخش هم با هر push به برنچ main ورک‌فلو را اجرا می‌کند (برای تست)
+    - cron: '0 */3 * * *'
   push:
     branches:
       - main
@@ -19,32 +14,32 @@ jobs:
   build-and-send:
     runs-on: ubuntu-latest
 
+    # ---> این بخش را اضافه کنید <---
+    defaults:
+      run:
+        working-directory: ./ # این خط تضمین می‌کند که دستورات در ریشه ریپازیتوری اجرا شوند
+
     steps:
-      # ۱. کدها رو از ریپازیتوری برمیداره
       - name: Checkout repository
         uses: actions/checkout@v3
 
-      # ۲. پایتون رو نصب و آماده می‌کنه
       - name: Set up Python
         uses: actions/setup-python@v4
         with:
           python-version: '3.10'
 
-      # ۳. کتابخانه‌های مورد نیاز رو نصب می‌کنه
+      # بقیه مراحل بدون تغییر باقی می‌مانند چون حالا در مسیر درست اجرا می‌شوند
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install -r files/requirements.txt
 
-      # ۴. اسکریپت اصلی برای جمع‌آوری و تغییر نام کانفیگ‌ها رو اجرا می‌کنه
       - name: Scrape and rename configs
         run: python files/app.py
 
-      # ۵. کانفیگ‌ها رو بر اساس پروتکل جدا می‌کنه
       - name: Sort configs by protocol
         run: python files/sort.py
 
-      # ۶. پراکسی‌های سالم رو به کانال تلگرام می‌فرسته
       - name: Test and send proxies to Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
