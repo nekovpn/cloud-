@@ -1,58 +1,52 @@
 # cloud/files/telegram_bot.py
 
 import telegram
-from telegram.ext import Updater, CommandHandler, CallbackContext
+from telegram.ext import Application, CommandHandler, CallbackContext
 import logging
+import asyncio # کتابخانه جدید برای اجرای همزمان
+
+# ... بقیه import ها مثل قبل ...
+import os
 import requests
 import base64
-import re
-import os
 from urllib.parse import urlparse, unquote
 import concurrent.futures
-
-# Import functions from your other scripts
 from app import run_scrape
 from sort import run_sort
 
+
 # --- Configuration ---
-BOT_TOKEN = "7483884524:AAF0PHPQFIoGsSzvodUcUPdGxDHzjIZjW0c"  # توکن ربات خود را اینجا قرار دهید
-CHANNEL_ID = "-1002234854094"  # شناسه کانال خود را اینجا قرار دهید (مثال: -100123456789)
-CHECK_URL = 'http://www.google.com/generate_204' # URL برای تست اتصال
-CHECK_TIMEOUT = 5  # 5 ثانیه برای هر تست
+BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
+CHANNEL_ID = os.environ.get("TELEGRAM_CHANNEL_ID")
+# ... بقیه کانفیگ‌ها مثل قبل ...
+CHECK_URL = 'http://www.google.com/generate_204'
+CHECK_TIMEOUT = 5
 SEND_INTERVAL_SECONDS = 3 * 60 * 60 # 3 ساعت
 MAX_PROXIES_TO_SEND = 10
+
 
 # --- Logging Setup ---
 logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 # --- Health Checker for ShadowSocks ---
+# این تابع بدون تغییر باقی می‌ماند
 def check_ss_proxy(proxy_url):
     try:
-        # Parse ss:// URL
-        # ss://method:password@server:port
         parsed_url = urlparse(proxy_url)
-        
-        # Base64 decode user info part
         user_info_b64 = parsed_url.username
-        # Add padding if needed
         user_info_b64 += '=' * (-len(user_info_b64) % 4)
         decoded_user_info = base64.b64decode(user_info_b64).decode('utf-8')
-        
         method, password = decoded_user_info.split(':', 1)
         server = parsed_url.hostname
         port = parsed_url.port
-        
-        # Unquote password just in case
         password = unquote(password)
-
         proxy_dict = {
-            'http': f'socks5://{server}:{port}',
-            'https': f'socks5://{server}:{port}'
+            'http': f'socks5h://{server}:{port}',
+            'https': f'socks5h://{server}:{port}'
         }
-
         response = requests.get(CHECK_URL, proxies=proxy_dict, timeout=CHECK_TIMEOUT)
-        
         if response.status_code == 204:
             logger.info(f"SUCCESS: Proxy {server}:{port} is working.")
             return proxy_url
@@ -64,77 +58,77 @@ def check_ss_proxy(proxy_url):
         return None
 
 # --- Main Bot Job ---
-def run_and_send_proxies(context: CallbackContext):
+# تابع اصلی حالا باید async باشه
+async def run_and_send_proxies(context: CallbackContext):
     bot = context.bot
-    bot.send_message(chat_id=CHANNEL_ID, text="🤖 فرآیند جمع‌آوری و تست پراکسی‌ها شروع شد...")
+    await bot.send_message(chat_id=CHANNEL_ID, text="🤖 فرآیند جمع‌آوری و تست پراکسی‌ها شروع شد...")
+    
+    # اجرای توابع سنکرون (معمولی) در یک ترد جداگانه
+    await asyncio.to_thread(run_scrape)
+    await asyncio.to_thread(run_sort)
 
-    # 1. Scrape, merge, and rename configs
-    run_scrape()
-
-    # 2. Sort configs into separate files
-    run_sort()
-
-    # 3. Read ShadowSocks configs
     ss_file_path = os.path.abspath(os.path.join(os.getcwd(), '..', 'Splitted-By-Protocol', 'ss.txt'))
     try:
         with open(ss_file_path, 'r', encoding='utf-8') as f:
             ss_proxies = [line.strip() for line in f if line.strip().startswith('ss://')]
     except FileNotFoundError:
-        bot.send_message(chat_id=CHANNEL_ID, text="⚠️ فایل پراکسی‌های شادوساکس پیدا نشد. فرآیند متوقف شد.")
+        await bot.send_message(chat_id=CHANNEL_ID, text="⚠️ فایل پراکسی‌های شادوساکس پیدا نشد.")
         return
 
     if not ss_proxies:
-        bot.send_message(chat_id=CHANNEL_ID, text="ℹ️ هیچ پراکسی شادوساکس برای تست پیدا نشد.")
+        await bot.send_message(chat_id=CHANNEL_ID, text="ℹ️ هیچ پراکسی شادوساکس برای تست پیدا نشد.")
         return
         
-    bot.send_message(chat_id=CHANNEL_ID, text=f"تست {len(ss_proxies)} سرور شادوساکس شروع شد. این مرحله ممکن است چند دقیقه طول بکشد...")
+    await bot.send_message(chat_id=CHANNEL_ID, text=f"تست {len(ss_proxies)} سرور شادوساکس شروع شد...")
 
-    # 4. Check proxies in parallel
     working_proxies = []
+    # اجرای تست‌ها در تردپول
     with concurrent.futures.ThreadPoolExecutor(max_workers=20) as executor:
-        future_to_proxy = {executor.submit(check_ss_proxy, proxy): proxy for proxy in ss_proxies}
-        for future in concurrent.futures.as_completed(future_to_proxy):
-            result = future.result()
-            if result:
-                working_proxies.append(result)
+        loop = asyncio.get_event_loop()
+        futures = [loop.run_in_executor(executor, check_ss_proxy, proxy) for proxy in ss_proxies]
+        for response in await asyncio.gather(*futures):
+            if response:
+                working_proxies.append(response)
 
-    # 5. Send results to channel
     if working_proxies:
-        message = "✅ پراکسی‌های سالم شادوساکس:\n\n"
-        message += "\n\n".join(working_proxies[:MAX_PROXIES_TO_SEND])
-        message += f"\n\n🆔 @proxyfig"
+        message_header = "✅ پراکسی‌های سالم شادوساکس:\n\n"
+        await bot.send_message(chat_id=CHANNEL_ID, text=message_header)
         
-        bot.send_message(chat_id=CHANNEL_ID, text=message)
+        for proxy in working_proxies[:MAX_PROXIES_TO_SEND]:
+            # برای کپی کردن راحت، از Markdown استفاده می‌کنیم
+            await bot.send_message(chat_id=CHANNEL_ID, text=f"`{proxy}`", parse_mode='MarkdownV2')
+        
+        await bot.send_message(chat_id=CHANNEL_ID, text="🆔 @proxyfig")
         logger.info(f"Sent {len(working_proxies[:MAX_PROXIES_TO_SEND])} working proxies to the channel.")
     else:
-        bot.send_message(chat_id=CHANNEL_ID, text="❌ متاسفانه هیچ پراکسی سالمی پیدا نشد.")
+        await bot.send_message(chat_id=CHANNEL_ID, text="❌ متاسفانه هیچ پراکسی سالمی پیدا نشد.")
         logger.warning("No working proxies found.")
 
 # --- Command Handlers ---
-def start(update, context):
-    update.message.reply_text('سلام! ربات فعال است و پراکسی‌ها را به صورت خودکار به کانال ارسال می‌کند. برای اجرای دستی، از دستور /runnow استفاده کنید.')
+# این توابع هم باید async باشند
+async def start(update, context):
+    await update.message.reply_text('سلام! ربات فعال است. برای اجرای دستی از /runnow استفاده کنید.')
 
-def run_now_command(update, context):
-    update.message.reply_text('باشه، فرآیند را به صورت دستی اجرا می‌کنم...')
+async def run_now_command(update, context):
+    await update.message.reply_text('باشه، فرآیند را به صورت دستی اجرا می‌کنم...')
     context.job_queue.run_once(run_and_send_proxies, 0)
 
 # --- Main Bot Function ---
 def main():
-    updater = Updater(BOT_TOKEN, use_context=True)
-    dispatcher = updater.dispatcher
-    job_queue = updater.job_queue
+    # ساختار جدید برای راه‌اندازی ربات
+    application = Application.builder().token(BOT_TOKEN).build()
     
-    # Add command handlers
-    dispatcher.add_handler(CommandHandler("start", start))
-    dispatcher.add_handler(CommandHandler("runnow", run_now_command))
+    # اضافه کردن دستورات
+    application.add_handler(CommandHandler("start", start))
+    application.add_handler(CommandHandler("runnow", run_now_command))
 
-    # Schedule the job
-    job_queue.run_repeating(run_and_send_proxies, interval=SEND_INTERVAL_SECONDS, first=10) # 10 ثانیه بعد از اجرا، اولین بار شروع میشه
+    # زمان‌بندی کار
+    job_queue = application.job_queue
+    job_queue.run_repeating(run_and_send_proxies, interval=SEND_INTERVAL_SECONDS, first=10)
 
-    # Start the Bot
-    updater.start_polling()
-    logger.info("Bot started and job scheduled.")
-    updater.idle()
+    # اجرای ربات
+    logger.info("Bot started...")
+    application.run_polling()
 
 if __name__ == '__main__':
     main()
