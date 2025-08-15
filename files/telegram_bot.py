@@ -67,7 +67,7 @@ async def run_and_send_proxies(context: CallbackContext):
     await asyncio.to_thread(run_scrape)
     await asyncio.to_thread(run_sort)
 
-    ss_file_path = os.path.abspath(os.path.join(os.getcwd(), '..', 'Splitted-By-Protocol', 'ss.txt'))
+    ss_file_path = os.path.abspath(os.path.join(os.getcwd(), '.', 'Splitted-By-Protocol', 'ss.txt'))
     try:
         with open(ss_file_path, 'r', encoding='utf-8') as f:
             ss_proxies = [line.strip() for line in f if line.strip().startswith('ss://')]
