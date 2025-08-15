@@ -133,7 +133,7 @@ def rename_configs(configs, new_name):
     return renamed_configs
 
 def ensure_directories_exist():
-    output_folder = os.path.abspath(os.path.join(os.getcwd(), ".."))
+    output_folder = os.path.abspath(os.path.join(os.getcwd(), "."))
     if not os.path.exists(output_folder):
         os.makedirs(output_folder)
     return output_folder
