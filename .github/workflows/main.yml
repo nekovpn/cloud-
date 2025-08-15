@@ -1,12 +1,15 @@
-name: Scrape, Test, and Send Proxies
+name: Scrape, Update, and Send Links
 
 on:
-  workflow_dispatch:  # اجازه اجرای دستی
+  workflow_dispatch:
   schedule:
-    - cron: '0 */3 * * *' # اجرای خودکار هر ۳ ساعت
+    - cron: '0 */3 * * *'
+  push:
+    branches:
+      - main
 
 jobs:
-  build-and-send:
+  build-and-deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
@@ -18,18 +21,28 @@ jobs:
           python-version: '3.10'
 
       - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r files/requirements.txt
+        run: pip install -r files/requirements.txt
 
       - name: Scrape and rename configs
         run: python files/app.py
 
-      - name: Sort configs by protocol
+      - name: Sort configs and encode to Base64
         run: python files/sort.py
+      
+      - name: Commit and push changes
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add All_Configs_Sub.txt
+          git add All_Configs_Base64.txt
+          git add Splitted-By-Protocol/
+          # فقط در صورتی کامیت کن که تغییری وجود داشته باشد
+          git diff-index --quiet HEAD || git commit -m "Updated proxy subscription files"
+          git push
 
-      - name: Test and send proxies to Telegram
+      - name: Send subscription links to Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHANNEL_ID: ${{ secrets.TELEGRAM_CHANNEL_ID }}
-        run: python files/telegram_bot.py
+          GITHUB_REPOSITORY: ${{ github.repository }}
+        run: python files/generate_and_send_links.py
