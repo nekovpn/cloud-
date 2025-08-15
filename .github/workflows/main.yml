@@ -34,15 +34,22 @@ jobs:
       - name: Sort configs and encode to Base64
         run: python files/sort.py
       
+      # ... (بقیه فایل yml بدون تغییر) ...
+
       - name: Commit and push changes
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
+          
+          # ---> این خط را اضافه کنید <---
+          git pull
+          
           git add All_Configs_Sub.txt All_Configs_Base64.txt Splitted-By-Protocol/
           # فقط در صورتی کامیت کن که تغییری وجود داشته باشد
           git diff-index --quiet HEAD || git commit -m "Updated proxy subscription files"
           git push
-
+          
+# ... (بقیه فایل yml بدون تغییر) ...
       - name: Send subscription links to Telegram
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
