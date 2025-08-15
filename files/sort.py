@@ -4,7 +4,7 @@ import requests, os, base64
 
 def run_sort():
     print("Sorting configs by protocol...")
-    ptt = os.path.abspath(os.path.join(os.getcwd(), '..', 'Splitted-By-Protocol'))
+    ptt = os.path.abspath(os.path.join(os.getcwd(), '.', 'Splitted-By-Protocol'))
     os.makedirs(ptt, exist_ok=True)
 
     files = {
@@ -22,7 +22,7 @@ def run_sort():
 
     try:
         # خواندن فایل از مسیر نسبی صحیح
-        sub_file_path = os.path.abspath(os.path.join(os.getcwd(), '..', 'All_Configs_Sub.txt'))
+        sub_file_path = os.path.abspath(os.path.join(os.getcwd(), '.', 'All_Configs_Sub.txt'))
         with open(sub_file_path, 'r', encoding='utf-8') as f:
             response_text = f.read()
             
