@@ -3,8 +3,7 @@
 import os, base64
 
 def run_sort():
-    print("Sorting configs by protocol...")
-    # فایل‌ها در ریشه پروژه ساخته می‌شوند
+    print("Sorting configs by protocol and encoding to Base64...")
     project_root = os.path.abspath(os.path.join(os.getcwd(), "."))
     ptt = os.path.join(project_root, 'Splitted-By-Protocol')
     os.makedirs(ptt, exist_ok=True)
@@ -35,12 +34,18 @@ def run_sort():
         print(f"Error reading subscription file: {e}")
         return
 
-    # برای شادوساکس، هر خط را جداگانه می‌نویسیم
-    if configs['ss']:
-        with open(files['ss'], 'w', encoding='utf-8') as f:
-            f.write('\n'.join(configs['ss']))
+    # Encode the content of each file to Base64
+    for protocol, data_list in configs.items():
+        if data_list:
+            # Join all configs into a single string separated by newlines
+            content_str = '\n'.join(data_list)
+            # Encode the entire string to Base64
+            encoded_content = base64.b64encode(content_str.encode('utf-8'))
+            # Write the Base64 encoded bytes to the file
+            with open(files[protocol], 'wb') as f:
+                f.write(encoded_content)
 
-    print("Sorting finished.")
+    print("Sorting and encoding finished.")
 
 if __name__ == "__main__":
     run_sort()
