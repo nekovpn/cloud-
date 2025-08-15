@@ -1,10 +1,12 @@
-# cloud/files/sort.py
+# cloud--main/files/sort.py
 
-import requests, os, base64
+import os, base64
 
 def run_sort():
     print("Sorting configs by protocol...")
-    ptt = os.path.abspath(os.path.join(os.getcwd(), '.', 'Splitted-By-Protocol'))
+    # فایل‌ها در ریشه پروژه ساخته می‌شوند
+    project_root = os.path.abspath(os.path.join(os.getcwd(), "."))
+    ptt = os.path.join(project_root, 'Splitted-By-Protocol')
     os.makedirs(ptt, exist_ok=True)
 
     files = {
@@ -14,15 +16,13 @@ def run_sort():
         'ss': os.path.join(ptt, 'ss.txt')
     }
 
-    # Clear previous files
-    for file in files.values():
-        open(file, 'w').close()
+    for file_path in files.values():
+        open(file_path, 'w').close()
 
     configs = {'vmess': [], 'vless': [], 'trojan': [], 'ss': []}
 
     try:
-        # خواندن فایل از مسیر نسبی صحیح
-        sub_file_path = os.path.abspath(os.path.join(os.getcwd(), '.', 'All_Configs_Sub.txt'))
+        sub_file_path = os.path.join(project_root, 'All_Configs_Sub.txt')
         with open(sub_file_path, 'r', encoding='utf-8') as f:
             response_text = f.read()
             
