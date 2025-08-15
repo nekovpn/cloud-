@@ -11,8 +11,8 @@ import concurrent.futures
 # --- Configuration from Environment Variables ---
 BOT_TOKEN = os.environ.get("TELEGRAM_BOT_TOKEN")
 CHANNEL_ID = os.environ.get("TELEGRAM_CHANNEL_ID")
-CHECK_URL = 'http://www.google.com/generate_204'
-CHECK_TIMEOUT = 5
+CHECK_URL = 'https://www.digikala.com/'
+CHECK_TIMEOUT = 10
 MAX_PROXIES_TO_SEND = 10
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
